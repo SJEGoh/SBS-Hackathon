@@ -4,17 +4,23 @@ import os
 
 # --- CONFIGURATION ---
 script_dir = os.path.dirname(os.path.abspath(__file__))
-mapping_file = os.path.join(script_dir, 'station_id_mapping.csv')
 
+# Define Data Directory (Go up one level, then into 'data')
+data_dir = os.path.join(os.path.dirname(script_dir), 'data')
+
+# Path to the mapping file (Created by process_edges.py inside 'data')
+mapping_file = os.path.join(data_dir, 'station_id_mapping.csv')
+
+# Input Node Files
 files = [
-    os.path.join(script_dir, 'transport_node_train_202509.csv'),
-    os.path.join(script_dir, 'transport_node_train_202510.csv'),
-    os.path.join(script_dir, 'transport_node_train_202511.csv')
+    os.path.join(data_dir, 'transport_node_train_202509.csv'),
+    os.path.join(data_dir, 'transport_node_train_202510.csv'),
+    os.path.join(data_dir, 'transport_node_train_202511.csv')
 ]
 
 # --- LOAD MAPPING ---
 if not os.path.exists(mapping_file):
-    raise FileNotFoundError("STOP! 'station_id_mapping.csv' not found.")
+    raise FileNotFoundError(f"STOP! Could not find '{mapping_file}'. \n   -> Please run 'process_edges.py' FIRST to generate the station IDs.")
 
 print("Loading station mapping...")
 map_df = pd.read_csv(mapping_file)
@@ -27,6 +33,7 @@ def clean_station_code(code):
 
 # --- MAIN LOOP ---
 df_list = []
+print(f"📂 Looking for data in: {data_dir}")
 
 for file in files:
     if not os.path.exists(file):
@@ -39,10 +46,11 @@ for file in files:
     if 'PT_TYPE' in temp_df.columns:
         temp_df = temp_df[temp_df['PT_TYPE'] == 'TRAIN'].copy()
 
+    # Clean & Map
     temp_df['STATION_CODE_CLEAN'] = temp_df['PT_CODE'].apply(clean_station_code)
     temp_df['STATION_ID'] = temp_df['STATION_CODE_CLEAN'].map(station_to_id)
 
-    # Drop missing stations
+    # Drop missing stations (those not in the Edge graph)
     temp_df = temp_df.dropna(subset=['STATION_ID'])
     temp_df['STATION_ID'] = temp_df['STATION_ID'].astype(int)
 
@@ -65,15 +73,15 @@ if df_list:
     df_nodes['OUT_FLOW_NORM'] = np.log1p(df_nodes['TOTAL_TAP_OUT_VOLUME'])
     df_nodes['IS_WEEKEND'] = df_nodes['DAY_TYPE'].apply(lambda x: 1 if 'WEEKEND' in x else 0)
 
-    # --- OPTIMIZATION: DROP STRING COLUMNS ---
+    # Drop string columns
     df_nodes = df_nodes.drop(columns=['DAY_TYPE'])
 
-    # Save
-    output_filename = os.path.join(script_dir, 'combined_node_features.csv')
+    # Save to 'data' folder
+    output_filename = os.path.join(data_dir, 'combined_node_features.csv')
     df_nodes.to_csv(output_filename, index=False)
     
     print("-" * 30)
-    print(f"Success! Optimized node features saved.")
+    print(f"✅ Success! Node features saved to: {os.path.basename(output_filename)}")
     print(df_nodes.head())
 
 else:
