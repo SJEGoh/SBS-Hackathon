@@ -1,4 +1,6 @@
-#!/Users/sjegoh/Documents/GitHub/SBS_hackathon/venv_SBS/bin/python3.12
+#!/bin/sh
+'''exec' "/Users/alvin/Documents/Projects/SBST Hackathon 2025/SBS-Hackathon/venv_SBS/bin/python3.13" "$0" "$@"
+' '''
 # -*- coding: utf-8 -*-
 import re
 import sys
