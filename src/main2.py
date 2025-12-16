@@ -1,5 +1,6 @@
 import math
 import torch
+from helper import month_norm, sincos_hour, is_weekend
 from torch_geometric.data import Data
 from torch_geometric.loader import DataLoader
 from GNN_model import CrowdGNN
@@ -40,21 +41,6 @@ edge_index = torch.tensor([
 ], dtype=torch.long)
 
 edge_weight = torch.tensor([0.15, 0.90, 0.60, 0.35, 0.20], dtype=torch.float32)
-
-# ----- Helpers for extras -----
-def month_norm(ym: str) -> float:
-    # ym like "2025-09"
-    m = int(ym.split("-")[1])
-    # map Sep..Dec -> 0..1
-    return (m - 9) / 3.0
-
-def sincos_hour(h: int):
-    ang = 2 * math.pi * (h / 24.0)
-    return math.sin(ang), math.cos(ang)
-
-def is_weekend(day_type: str) -> float:
-    return 1.0 if "WEEKENDS" in day_type else 0.0
-
 # ----- Dummy "crowding" built from (tap in/out) style patterns -----
 # We'll just craft plausible station-specific patterns with peak hours + weekend effects.
 base = torch.tensor([0.55, 0.65, 0.60, 0.58, 0.50])  # per station baseline
@@ -103,7 +89,6 @@ for t in range(2, T-1):
         y=X[t+1][:, 0],             # (N,)
     )
     dataset.append(data_t)
-print(f"Dataset: {dataset}")
 loader = DataLoader(dataset, batch_size=4, shuffle=True)
 
 print("X shape:", X.shape)                 # (T, N, 6)
@@ -111,7 +96,6 @@ print("edge_index:", edge_index.shape)     # (2, E)
 print("edge_weight:", edge_weight.shape)   # (E,)
 print("sample:", dataset[0])
 print("sample x:", dataset[0].x.shape, "y:", dataset[0].y.shape)
-
 
 
 
