@@ -1,4 +1,3 @@
-import math
 import torch
 from helper import month_norm, sincos_hour, is_weekend
 from torch_geometric.data import Data
