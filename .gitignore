@@ -215,4 +215,4 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-data_cleaning_test_var/
+cleaning_scripts/
