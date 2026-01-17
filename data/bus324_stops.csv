@@ -1,10 +1,10 @@
-ID,PT_CODE,PT_NAME
-1,64009,Hougang Ctrl Int
-2,64041,The Midtown
-3,64051,Blk 465A
-4,62271,Opp Blk 475B
-5,62251,Bef Blk 471B
-6,62261,Opp S’goon Sec Sch
-7,64059,Blk 355
-8,64049,Opp The Midtown
-9,64009,Hougang Ctrl Int
+ID,PT_CODE,PT_NAME,NO_OF_SERVICES
+1,64009,Hougang Ctrl Int,18
+2,64041,The Midtown,8
+3,64051,Blk 465A,8
+4,62271,Opp Blk 475B,1
+5,62251,Bef Blk 471B,1
+6,62261,Opp S’goon Sec Sch,1
+7,64059,Blk 355,8
+8,64049,Opp The Midtown,8
+9,64009,Hougang Ctrl Int,18

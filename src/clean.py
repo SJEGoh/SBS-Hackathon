@@ -2,7 +2,6 @@
 
 import numpy as np
 import pandas as pd
-import json
 
 """PART I: RAINFALL, TEMPERATURE"""
 
@@ -75,7 +74,13 @@ data_seletar = df_seletar.groupby(['Month', 'Day Type']).agg(
 humid_df = pd.read_csv('data/RelativeHumidityMonthlyMean.csv')
 
 # Filter for 2025-10, 2025-11, and 2025-12
-humid_df_filtered = humid_df[df['month'].str.contains('2025-(10|11|12)', regex=True)]
+data_humidity = humid_df[humid_df['month'].str.contains('2025-(10|11|12)', regex=True)].copy()
+
+# Rename the mean-rh column to RELATIVE_HUMIDITY
+if 'mean-rh' in data_humidity.columns:
+    data_humidity = data_humidity.rename(columns={'mean-rh': 'RELATIVE_HUMIDITY'})
+elif 'mean_rh' in data_humidity.columns:
+    data_humidity = data_humidity.rename(columns={'mean_rh': 'RELATIVE_HUMIDITY'})
 
 """PART III: PASSENGER LOAD"""
 
@@ -83,7 +88,7 @@ stops_files = ["data/transport_node_bus_202510.csv",
                "data/transport_node_bus_202511.csv",
                "data/transport_node_bus_202512.csv"]
 
-df_volume = pd.concat([pd.read_csv(f) for f in stops_files], ignore_index = True).drop(['PT_TYPE'])
+df_volume = pd.concat([pd.read_csv(f) for f in stops_files], ignore_index=True).rename(columns=str.strip).drop(["PT_TYPE"], axis=1)
 
 # Read bus stop codes for each route
 bus324_stops = pd.read_csv('data/bus324_stops.csv')
@@ -93,9 +98,105 @@ bus329_stops = pd.read_csv('data/bus329_stops.csv')
 df_volume_324 = df_volume[df_volume['PT_CODE'].isin(bus324_stops['PT_CODE'])]
 df_volume_329 = df_volume[df_volume['PT_CODE'].isin(bus329_stops['PT_CODE'])]
 
-# Load Bus Routes JSON
-with open("bus_routes.json", "r") as f:
-    temp = json.load(f)
+# Merge with bus stop data to get NO_OF_SERVICES and ID
+df_volume_324 = df_volume_324.merge(bus324_stops[['PT_CODE', 'NO_OF_SERVICES', 'ID']], on='PT_CODE', how='left')
+df_volume_329 = df_volume_329.merge(bus329_stops[['PT_CODE', 'NO_OF_SERVICES', 'ID']], on='PT_CODE', how='left')
 
-# Convert to DataFrame
-df_routes = pd.DataFrame(temp)
+# Calculate the number of unique DAY_TYPEs per YEAR_MONTH for each bus route
+df_volume_324['NUM_DAY_TYPES'] = df_volume_324.groupby('YEAR_MONTH')['DAY_TYPE'].transform('nunique')
+df_volume_329['NUM_DAY_TYPES'] = df_volume_329.groupby('YEAR_MONTH')['DAY_TYPE'].transform('nunique')
+
+# Calculate NET_AVG_CHANGE = (TAP_IN - TAP_OUT) / (n * d)
+# where n = NO_OF_SERVICES, d = number of day types in that month
+df_volume_324['NET_AVG_CHANGE'] = (df_volume_324['TOTAL_TAP_IN_VOLUME'] - df_volume_324['TOTAL_TAP_OUT_VOLUME']) / (df_volume_324['NO_OF_SERVICES'] * df_volume_324['NUM_DAY_TYPES'])
+df_volume_329['NET_AVG_CHANGE'] = (df_volume_329['TOTAL_TAP_IN_VOLUME'] - df_volume_329['TOTAL_TAP_OUT_VOLUME']) / (df_volume_329['NO_OF_SERVICES'] * df_volume_329['NUM_DAY_TYPES'])
+
+# Sort by YEAR_MONTH ascending, DAY_TYPE, TIME_PER_HOUR ascending, then by ID
+df_volume_324 = df_volume_324.sort_values(by=['YEAR_MONTH', 'DAY_TYPE', 'TIME_PER_HOUR', 'ID'], ascending=[True, True, True, True])
+df_volume_329 = df_volume_329.sort_values(by=['YEAR_MONTH', 'DAY_TYPE', 'TIME_PER_HOUR', 'ID'], ascending=[True, True, True, True])
+
+# Drop the helper column if you don't need it
+df_volume_324 = df_volume_324.drop('NUM_DAY_TYPES', axis=1)
+df_volume_329 = df_volume_329.drop('NUM_DAY_TYPES', axis=1)
+
+# Read bus frequency data
+bus324_freq = pd.read_csv('data/bus324_freq.csv')
+bus329_freq = pd.read_csv('data/bus329_freq.csv')
+
+# Merge frequency data with volume data
+df_volume_324 = df_volume_324.merge(bus324_freq[['TIME_PER_HOUR', 'DAY_TYPE', 'AVG_BUS_PER_HOUR']], on=['TIME_PER_HOUR', 'DAY_TYPE'], how='left')
+df_volume_329 = df_volume_329.merge(bus329_freq[['TIME_PER_HOUR', 'DAY_TYPE', 'AVG_BUS_PER_HOUR']], on=['TIME_PER_HOUR', 'DAY_TYPE'], how='left')
+
+# Drop rows with NaN values in AVG_BUS_PER_HOUR
+df_volume_324 = df_volume_324.dropna(subset=['AVG_BUS_PER_HOUR'])
+df_volume_329 = df_volume_329.dropna(subset=['AVG_BUS_PER_HOUR'])
+
+# Calculate EST_LOAD using cumulative sum within each group, then divide by AVG_BUS_PER_HOUR
+df_volume_324['EST_LOAD'] = df_volume_324.groupby(['YEAR_MONTH', 'DAY_TYPE', 'TIME_PER_HOUR'])['NET_AVG_CHANGE'].cumsum() / df_volume_324['AVG_BUS_PER_HOUR']
+df_volume_329['EST_LOAD'] = df_volume_329.groupby(['YEAR_MONTH', 'DAY_TYPE', 'TIME_PER_HOUR'])['NET_AVG_CHANGE'].cumsum() / df_volume_329['AVG_BUS_PER_HOUR']
+
+# Create combined dataframes with mean and variance of EST_LOAD
+df_combined_324 = df_volume_324.groupby(['YEAR_MONTH', 'DAY_TYPE', 'TIME_PER_HOUR']).agg(
+    MEAN_EST_LOAD=('EST_LOAD', 'mean'),
+    VARIANCE_EST_LOAD=('EST_LOAD', 'var')
+).reset_index()
+
+df_combined_329 = df_volume_329.groupby(['YEAR_MONTH', 'DAY_TYPE', 'TIME_PER_HOUR']).agg(
+    MEAN_EST_LOAD=('EST_LOAD', 'mean'),
+    VARIANCE_EST_LOAD=('EST_LOAD', 'var')
+).reset_index()
+
+# Prepare data for merging with weather and humidity data
+# Add YEAR_MONTH to data_punggol and data_seletar
+data_punggol['YEAR_MONTH'] = '2025-' + data_punggol['Month'].astype(str).str.zfill(2)
+data_seletar['YEAR_MONTH'] = '2025-' + data_seletar['Month'].astype(str).str.zfill(2)
+
+# Rename 'Day Type' to 'DAY_TYPE' for consistency
+data_punggol = data_punggol.rename(columns={'Day Type': 'DAY_TYPE'})
+data_seletar = data_seletar.rename(columns={'Day Type': 'DAY_TYPE'})
+
+# Extract YEAR_MONTH from the 'month' column in data_humidity
+data_humidity['YEAR_MONTH'] = data_humidity['month'].str.extract(r'(\d{4}-\d{2})')[0]
+
+# Merge weather data with combined dataframes
+df_combined_324 = df_combined_324.merge(
+    data_punggol[['YEAR_MONTH', 'DAY_TYPE', 'Mean_Rainfall_Punggol', 'Variance_Rainfall_Punggol']], 
+    on=['YEAR_MONTH', 'DAY_TYPE'], 
+    how='left'
+)
+df_combined_324 = df_combined_324.merge(
+    data_seletar[['YEAR_MONTH', 'DAY_TYPE', 'Mean_Rainfall_Seletar', 'Variance_Rainfall_Seletar', 'Mean_Temperature_Seletar']], 
+    on=['YEAR_MONTH', 'DAY_TYPE'], 
+    how='left'
+)
+df_combined_324 = df_combined_324.merge(
+    data_humidity[['YEAR_MONTH', 'RELATIVE_HUMIDITY']], 
+    on='YEAR_MONTH', 
+    how='left'
+)
+
+df_combined_329 = df_combined_329.merge(
+    data_punggol[['YEAR_MONTH', 'DAY_TYPE', 'Mean_Rainfall_Punggol', 'Variance_Rainfall_Punggol']], 
+    on=['YEAR_MONTH', 'DAY_TYPE'], 
+    how='left'
+)
+df_combined_329 = df_combined_329.merge(
+    data_seletar[['YEAR_MONTH', 'DAY_TYPE', 'Mean_Rainfall_Seletar', 'Variance_Rainfall_Seletar', 'Mean_Temperature_Seletar']], 
+    on=['YEAR_MONTH', 'DAY_TYPE'], 
+    how='left'
+)
+df_combined_329 = df_combined_329.merge(
+    data_humidity[['YEAR_MONTH', 'RELATIVE_HUMIDITY']], 
+    on='YEAR_MONTH', 
+    how='left'
+)
+
+# Convert all column names to uppercase
+df_combined_324.columns = df_combined_324.columns.str.upper()
+df_combined_329.columns = df_combined_329.columns.str.upper()
+
+# Save combined dataframes to CSV
+df_combined_324.to_csv('data/data_324.csv', index=False)
+df_combined_329.to_csv('data/data_329.csv', index=False)
+
+
