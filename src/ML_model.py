@@ -1,5 +1,5 @@
 import numpy as np
-from sklearn.ensemble import HistGradientBoostingRegresso
+from sklearn.ensemble import HistGradientBoostingRegressor
 
 class MLDrift:
     def __init__(self):
@@ -18,7 +18,11 @@ class MLDrift:
 
     def fit(self, fuel_efficiency, features):
         r = np.asarray(fuel_efficiency).reshape(-1)
-        X, y = [], []
+
+        self.model.fit(features, r)
+        # Look into sample weight
+        self._fitted = True
 
 
-        
+
+

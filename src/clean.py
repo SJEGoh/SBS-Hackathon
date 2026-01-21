@@ -209,14 +209,48 @@ def clean_bus_data():
     
     return df_combined_324, df_combined_329
 
+# Date, Bus, Model, Mileage start (hour), Mileage end (hour), Fuel efficiency
+# Things to add (one hot): weekend, daily weather 
+
+def fuel_efficiency_data():
+    df = pd.read_excel("data/fuel_efficiency.xlsx")[["Date", "Bus", "Model", "Fuel Efficiency KML", "Mileage Start Time", "Mileage End Time", "Operational status", "Workshop activities"]]
+    df = df.dropna()
+    df = df[(df["Date"] >= "2025-04-01") & (df["Date"] <= "2025-07-31")]
+    df["start_time"] = df["Mileage Start Time"].apply(lambda x: x.split()[1])
+    df["end_time"] = df["Mileage End Time"].apply(lambda x: x.split()[1])
+    df.drop(["Mileage Start Time", "Mileage End Time"], axis = 1, inplace = True)
+
+    sg_holidays = [
+        '2025-04-01',  # Hari Raya Puasa
+        '2025-04-18',  # Good Friday
+        '2025-05-01',  # Labour Day
+        '2025-05-22',  # Vesak Day
+        '2025-06-18',  # Hari Raya Haji
+    ]
+
+    sg_holidays = pd.to_datetime(sg_holidays)
+
+    df["start_time"] = pd.to_datetime(df["start_time"].str.replace(r"\s*\+\d{2}(:?\d{2})?$", "", regex=True), utc=True, errors="coerce").dt.tz_localize(None).dt.round("h").dt.hour
+    df["end_time"]   = pd.to_datetime(df["end_time"].str.replace(r"\s*\+\d{2}(:?\d{2})?$", "", regex=True),   utc=True, errors="coerce").dt.tz_localize(None).dt.round("h").dt.hour
+    df["weekend"] = pd.to_numeric(df["Date"].dt.strftime("%w"))
+    df["weekend/ph"] = np.where((df["weekend"] == 0) | (df["weekend"] == 6) | (df["weekend"].isin(sg_holidays)), 1, 0)
+
+    # add weather later :P
+    return df
+
+# ok so now take start time, end time and calculate passenger load + variance across that period?
 
 if __name__ == '__main__':
     # Call the function and get the dataframes
+    '''
     data324, data329 = clean_bus_data()
     print("Data cleaned successfully!")
     print(f"data324 shape: {data324.shape}")
     print(f"data329 shape: {data329.shape}")
     print(data324.head())
     print(data324.columns)
+    '''
+    print(fuel_efficiency_data())
+
 
 
