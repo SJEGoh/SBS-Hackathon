@@ -8,7 +8,8 @@ def main():
     # actual store into a sql database
 
     data = merge_data()
-    train_split = int(len(data) * 0.9)
+    data = data[data["Operational status"] == 5]
+    train_split = int(len(data) * 0.7)
     train_data = data[:train_split]
     test_data = data[train_split:]
 
@@ -21,7 +22,20 @@ def main():
                                                             "Seletar_Rainfall_mm", "Seletar_Temperature_C", "mu_load",
                                                             "sd_load"]])
 
-    # 
+    results = model.predict(test_data[["weekend/ph", "Punggol_Rainfall_mm",
+                "Seletar_Rainfall_mm", "Seletar_Temperature_C", "mu_load",
+                "sd_load"]])
+    
+    residuals = results - test_data["Fuel Efficiency KML"]
+    
+    kalman = Kalman()
+
+    kalman.fit(list(residuals[:len(residuals)//2]))
+
+    for z in list(residuals[len(residuals)//2:]):
+        print(kalman.step(z))
+        # put this into sql database
+
 
 if __name__ == "__main__":
     main()
