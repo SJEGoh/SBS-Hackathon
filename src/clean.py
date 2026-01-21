@@ -89,7 +89,12 @@ def clean_bus_data():
 
 
 def fuel_efficiency_data():
-    df = pd.read_excel("data/fuel_efficiency.xlsx")[["Date", "Bus", "Model", "Fuel Efficiency KML", "Mileage Start Time", "Mileage End Time", "Operational status", "Workshop activities"]]
+    df1 = pd.read_excel("data/fuel_efficiency.xlsx", sheet_name = "SBS8413R")[["Date", "Bus", "Model", "Fuel Efficiency KML", "Mileage Start Time", "Mileage End Time", "Operational status", "Workshop activities"]]
+    df2 = pd.read_excel("data/fuel_efficiency.xlsx", sheet_name = "SBS8793T")[["Date", "Bus", "Model", "Fuel Efficiency KML", "Mileage Start Time", "Mileage End Time", "Operational Status", "Workshop activities"]]
+    df2.columns = ["Date", "Bus", "Model", "Fuel Efficiency KML", "Mileage Start Time", "Mileage End Time", "Operational status", "Workshop activities"]
+    df3 = pd.read_excel("data/fuel_efficiency.xlsx", sheet_name = "SBS8976H")[["Date", "Bus", "Model", "Fuel Efficiency KML", "Mileage Start Time", "Mileage End Time", "Operational status", "Workshop activities"]]
+    
+    df = pd.concat([df1, df2, df3], axis = 0)
     df = df.dropna()
     df = df[(df["Date"] >= "2025-04-01") & (df["Date"] <= "2025-06-30")]
     df["start_time"] = df["Mileage Start Time"].apply(lambda x: x.split()[1])
@@ -140,7 +145,8 @@ def fuel_efficiency_data():
     # Merge weather data with fuel efficiency data
     df = df.merge(df_punggol, on='Date', how='left')
     df = df.merge(df_seletar, on='Date', how='left')
-    
+    df = df.sort_values(["Date", "Bus"], ascending = True)
+    df.reset_index(drop = True, inplace = True)
     return df
 
 # ['Date', 'Bus', 'Model', 'Fuel Efficiency KML', 'Operational status',
@@ -188,7 +194,6 @@ def find_mu_sd(fuel_eff, pass_vol):
         # write back into the original fuel_eff for that month
         fuel_eff.loc[fuel_eff["YEAR_MONTH"] == y_m, "mu_load"] = mu_load
         fuel_eff.loc[fuel_eff["YEAR_MONTH"] == y_m, "sd_load"] = sd_load
-
     return fuel_eff
 
 

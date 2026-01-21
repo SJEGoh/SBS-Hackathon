@@ -9,7 +9,7 @@ def main():
 
     data = merge_data()
     data = data[data["Operational status"] == 5]
-    train_split = int(len(data) * 0.7)
+    train_split = int(len(data) * 0.8)
     train_data = data[:train_split]
     test_data = data[train_split:]
 
@@ -17,7 +17,7 @@ def main():
     print(good_train.columns)
     # this model predict fuel efficiency
     model = ML_model()
-
+    print(good_train.columns)
     model.fit(good_train["Fuel Efficiency KML"], good_train[["weekend/ph", "Punggol_Rainfall_mm",
                                                             "Seletar_Rainfall_mm", "Seletar_Temperature_C", "mu_load",
                                                             "sd_load"]])
@@ -25,13 +25,16 @@ def main():
     results = model.predict(test_data[["weekend/ph", "Punggol_Rainfall_mm",
                 "Seletar_Rainfall_mm", "Seletar_Temperature_C", "mu_load",
                 "sd_load"]])
-    
+    # compare prediction here against naive approach
+    print(results)
+    print(test_data[["Fuel Efficiency KML", "Workshop activities"]])
+
     residuals = results - test_data["Fuel Efficiency KML"]
     
     kalman = Kalman()
 
     kalman.fit(list(residuals[:len(residuals)//2]))
-
+    # compare prediction here against naive approach
     for z in list(residuals[len(residuals)//2:]):
         print(kalman.step(z))
         # put this into sql database
