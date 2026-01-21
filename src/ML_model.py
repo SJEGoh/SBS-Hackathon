@@ -1,7 +1,7 @@
 import numpy as np
 from sklearn.ensemble import HistGradientBoostingRegressor
 
-class MLDrift:
+class ML_model:
     def __init__(self):
         self.model = HistGradientBoostingRegressor(
             max_depth=5,
