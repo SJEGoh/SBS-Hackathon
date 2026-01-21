@@ -7,19 +7,22 @@ import pandas as pd
 
 # Read and Combine Punggol CSVs
 
-punggol_files = ["data/DAILYDATA_Punggol_202510.csv", 
-                 "data/DAILYDATA_Punggol_202511.csv",
-                 "data/DAILYDATA_Punggol_202512.csv"]
+punggol_files = ["data/DAILYDATA_Punggol_202504.csv", 
+                 "data/DAILYDATA_Punggol_202505.csv",
+                 "data/DAILYDATA_Punggol_202506.csv"]
 cols_to_keep_p = ["Year",
                 "Month",
                 "Day",
                 "Daily Rainfall Total (mm)"]
 df_punggol = pd.concat([pd.read_csv(f)[cols_to_keep_p] for f in punggol_files], ignore_index = True)
 
-# Singapore Public Holidays for Oct-Dec 2025
+# Singapore Public Holidays for Apr-Jun 2025
 sg_holidays = [
-    '2025-11-01',  # Deepavali
-    '2025-12-25',  # Christmas Day
+    '2025-04-01',  # Hari Raya Puasa
+    '2025-04-18',  # Good Friday
+    '2025-05-01',  # Labour Day
+    '2025-05-22',  # Vesak Day
+    '2025-06-18',  # Hari Raya Haji
 ]
 
 # Convert Day to datetime
@@ -44,9 +47,9 @@ data_punggol = df_punggol.groupby(['Month', 'Day Type'])['Daily Rainfall Total (
 
 # Read and Combine Seletar CSVs
 
-seletar_files = ["data/DAILYDATA_Seletar_202510.csv", 
-                 "data/DAILYDATA_Seletar_202511.csv",
-                 "data/DAILYDATA_Seletar_202512.csv"]
+seletar_files = ["data/DAILYDATA_Seletar_202504.csv", 
+                 "data/DAILYDATA_Seletar_202505.csv",
+                 "data/DAILYDATA_Seletar_202506.csv"]
 cols_to_keep_s = ["Year",
                 "Month",
                 "Day",
@@ -73,8 +76,8 @@ data_seletar = df_seletar.groupby(['Month', 'Day Type']).agg(
 
 humid_df = pd.read_csv('data/RelativeHumidityMonthlyMean.csv')
 
-# Filter for 2025-10, 2025-11, and 2025-12
-data_humidity = humid_df[humid_df['month'].str.contains('2025-(10|11|12)', regex=True)].copy()
+# Filter for 2025-04, 2025-05, and 2025-06
+data_humidity = humid_df[humid_df['month'].str.contains('2025-(04|05|06)', regex=True)].copy()
 
 # Rename the mean-rh column to RELATIVE_HUMIDITY
 if 'mean-rh' in data_humidity.columns:
@@ -158,35 +161,47 @@ data_seletar = data_seletar.rename(columns={'Day Type': 'DAY_TYPE'})
 # Extract YEAR_MONTH from the 'month' column in data_humidity
 data_humidity['YEAR_MONTH'] = data_humidity['month'].str.extract(r'(\d{4}-\d{2})')[0]
 
-# Merge weather data with combined dataframes
+# Map Apr-Jun weather data to Oct-Dec (Apr→Oct, May→Nov, Jun→Dec)
+month_mapping = {'2025-04': '2025-10', '2025-05': '2025-11', '2025-06': '2025-12'}
+
+data_punggol_mapped = data_punggol.copy()
+data_punggol_mapped['YEAR_MONTH'] = data_punggol_mapped['YEAR_MONTH'].map(month_mapping)
+
+data_seletar_mapped = data_seletar.copy()
+data_seletar_mapped['YEAR_MONTH'] = data_seletar_mapped['YEAR_MONTH'].map(month_mapping)
+
+data_humidity_mapped = data_humidity.copy()
+data_humidity_mapped['YEAR_MONTH'] = data_humidity_mapped['YEAR_MONTH'].map(month_mapping)
+
+# Merge weather data with combined dataframes using mapped data
 df_combined_324 = df_combined_324.merge(
-    data_punggol[['YEAR_MONTH', 'DAY_TYPE', 'Mean_Rainfall_Punggol', 'Variance_Rainfall_Punggol']], 
+    data_punggol_mapped[['YEAR_MONTH', 'DAY_TYPE', 'Mean_Rainfall_Punggol', 'Variance_Rainfall_Punggol']], 
     on=['YEAR_MONTH', 'DAY_TYPE'], 
     how='left'
 )
 df_combined_324 = df_combined_324.merge(
-    data_seletar[['YEAR_MONTH', 'DAY_TYPE', 'Mean_Rainfall_Seletar', 'Variance_Rainfall_Seletar', 'Mean_Temperature_Seletar']], 
+    data_seletar_mapped[['YEAR_MONTH', 'DAY_TYPE', 'Mean_Rainfall_Seletar', 'Variance_Rainfall_Seletar', 'Mean_Temperature_Seletar']], 
     on=['YEAR_MONTH', 'DAY_TYPE'], 
     how='left'
 )
 df_combined_324 = df_combined_324.merge(
-    data_humidity[['YEAR_MONTH', 'RELATIVE_HUMIDITY']], 
+    data_humidity_mapped[['YEAR_MONTH', 'RELATIVE_HUMIDITY']], 
     on='YEAR_MONTH', 
     how='left'
 )
 
 df_combined_329 = df_combined_329.merge(
-    data_punggol[['YEAR_MONTH', 'DAY_TYPE', 'Mean_Rainfall_Punggol', 'Variance_Rainfall_Punggol']], 
+    data_punggol_mapped[['YEAR_MONTH', 'DAY_TYPE', 'Mean_Rainfall_Punggol', 'Variance_Rainfall_Punggol']], 
     on=['YEAR_MONTH', 'DAY_TYPE'], 
     how='left'
 )
 df_combined_329 = df_combined_329.merge(
-    data_seletar[['YEAR_MONTH', 'DAY_TYPE', 'Mean_Rainfall_Seletar', 'Variance_Rainfall_Seletar', 'Mean_Temperature_Seletar']], 
+    data_seletar_mapped[['YEAR_MONTH', 'DAY_TYPE', 'Mean_Rainfall_Seletar', 'Variance_Rainfall_Seletar', 'Mean_Temperature_Seletar']], 
     on=['YEAR_MONTH', 'DAY_TYPE'], 
     how='left'
 )
 df_combined_329 = df_combined_329.merge(
-    data_humidity[['YEAR_MONTH', 'RELATIVE_HUMIDITY']], 
+    data_humidity_mapped[['YEAR_MONTH', 'RELATIVE_HUMIDITY']], 
     on='YEAR_MONTH', 
     how='left'
 )
