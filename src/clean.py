@@ -216,5 +216,7 @@ if __name__ == '__main__':
     print("Data cleaned successfully!")
     print(f"data324 shape: {data324.shape}")
     print(f"data329 shape: {data329.shape}")
+    print(data324.head())
+    print(data324.columns)
 
 
