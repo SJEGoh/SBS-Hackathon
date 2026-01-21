@@ -18,10 +18,12 @@ class ML_model:
 
     def fit(self, fuel_efficiency, features):
         r = np.asarray(fuel_efficiency).reshape(-1)
-
         self.model.fit(features, r)
         # Look into sample weight
         self._fitted = True
+        print("Model fitted!")
+
+    
 
 
 

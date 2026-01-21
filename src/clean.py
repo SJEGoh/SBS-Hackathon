@@ -80,13 +80,16 @@ def clean_bus_data():
     # Convert all column names to uppercase
     df_combined_5.columns = df_combined_5.columns.str.upper()
     
+    df_combined_5[["YEAR", "MONTH"]] = pd.DataFrame(df_combined_5["YEAR_MONTH"].str.split("-").tolist(), index = df_combined_5.index)
+
+    df_combined_5["MONTH"] = (pd.to_numeric(df_combined_5["MONTH"]) - 6).apply(str)
+    df_combined_5["YEAR_MONTH"] = df_combined_5["YEAR"] + "-0" + df_combined_5["MONTH"]
+    df_combined_5.drop(["MONTH", "YEAR"], axis = 1, inplace = True)
     return df_combined_5
 
-# Date, Bus, Model, Mileage start (hour), Mileage end (hour), Fuel efficiency
-# Things to add (one hot): weekend, daily weather 
 
 def fuel_efficiency_data():
-    df = pd.read_excel("src/data/fuel_efficiency.xlsx")[["Date", "Bus", "Model", "Fuel Efficiency KML", "Mileage Start Time", "Mileage End Time", "Operational status", "Workshop activities"]]
+    df = pd.read_excel("data/fuel_efficiency.xlsx")[["Date", "Bus", "Model", "Fuel Efficiency KML", "Mileage Start Time", "Mileage End Time", "Operational status", "Workshop activities"]]
     df = df.dropna()
     df = df[(df["Date"] >= "2025-04-01") & (df["Date"] <= "2025-06-30")]
     df["start_time"] = df["Mileage Start Time"].apply(lambda x: x.split()[1])
@@ -104,9 +107,9 @@ def fuel_efficiency_data():
     sg_holidays = pd.to_datetime(sg_holidays)
 
     df["start_time"] = pd.to_datetime(df["start_time"].str.replace(r"\s*\+\d{2}(:?\d{2})?$", "", regex=True), utc=True, errors="coerce").dt.tz_localize(None).dt.round("h").dt.hour
-    df["end_time"]   = pd.to_datetime(df["end_time"].str.replace(r"\s*\+\d{2}(:?\d{2})?$", "", regex=True),   utc=True, errors="coerce").dt.tz_localize(None).dt.round("h").dt.hour
-    df["weekend"] = pd.to_numeric(df["Date"].dt.strftime("%w"))
-    df["weekend/ph"] = np.where((df["weekend"] == 0) | (df["weekend"] == 6) | (df["weekend"].isin(sg_holidays)), 1, 0)
+    df["end_time"]   = pd.to_datetime(df["end_time"].str.replace(r"\s*\+\d{2}(:?\d{2})?$","", regex=True),   utc=True, errors="coerce").dt.tz_localize(None).dt.round("h").dt.hour
+    df["weekend/ph"] = pd.to_numeric(df["Date"].dt.strftime("%w"))
+    df["weekend/ph"] = np.where((df["weekend/ph"] == 0) | (df["weekend/ph"] == 6) | (df["weekend/ph"].isin(sg_holidays)), 1, 0)
 
     # ======================== ADD WEATHER DATA ========================
     
@@ -140,19 +143,79 @@ def fuel_efficiency_data():
     
     return df
 
+# ['Date', 'Bus', 'Model', 'Fuel Efficiency KML', 'Operational status',
+#     'Workshop activities', 'start_time', 'end_time', 'weekend/ph',
+#      'Punggol_Rainfall_mm', 'Seletar_Rainfall_mm', 'Seletar_Temperature_C']
+
 # ok so now take start time, end time and calculate passenger load + variance across that period?
+
+def time_check(start, end):
+    if end < start:
+        return list(range(end, 23)) + list(range(0, start))
+    return list(range(start, end))
+
+def find_mu_sd(fuel_eff, pass_vol):
+    for y_m in fuel_eff["YEAR_MONTH"].unique():
+        working_fuel_df = fuel_eff[fuel_eff["YEAR_MONTH"] == y_m]
+        working_pass_df = pass_vol[pass_vol["YEAR_MONTH"] == y_m]
+
+        working_fuel_df["range"] = working_fuel_df.apply(lambda r: time_check(r["start_time"], r["end_time"]), axis = 1)
+        # for each row/date, compute avg load/var across those hours
+
+        working_fuel_df["avg_load"] = working_fuel_df.apply(
+            lambda r: working_pass_df.loc[
+                (working_pass_df["DAY_TYPE"] == r["weekend/ph"]) &
+                (working_pass_df["TIME_PER_HOUR"].isin(r["range"])),
+                "MEAN_EST_LOAD"
+            ].mean(),
+            axis=1
+        )
+
+        working_fuel_df["avg_var"] = working_fuel_df.apply(
+            lambda r: working_pass_df.loc[
+                (working_pass_df["DAY_TYPE"] == r["weekend/ph"]) &
+                (working_pass_df["TIME_PER_HOUR"].isin(r["range"])),
+                "VARIANCE_EST_LOAD"
+            ].mean(),
+            axis=1
+        )
+
+        # month-level μ and σ (across days in that month)
+        mu_load = working_fuel_df["avg_load"].mean()
+        sd_load = working_fuel_df["avg_load"].std()
+
+
+        # write back into the original fuel_eff for that month
+        fuel_eff.loc[fuel_eff["YEAR_MONTH"] == y_m, "mu_load"] = mu_load
+        fuel_eff.loc[fuel_eff["YEAR_MONTH"] == y_m, "sd_load"] = sd_load
+
+    return fuel_eff
+
+
+
+def merge_data():
+    fuel_eff = fuel_efficiency_data()
+    pass_vol = clean_bus_data()
+
+    # one hot encode weekeday / weekend
+    fuel_eff["YEAR_MONTH"] = fuel_eff["Date"].dt.strftime("%Y-%m")
+    pass_vol["DAY_TYPE"] = np.where(pass_vol["DAY_TYPE"] == "WEEKEND/HOLIDAY", 1, 0)
+
+    return find_mu_sd(fuel_eff, pass_vol)
+
+
+
 
 if __name__ == '__main__':
     # Call the function and get the dataframes
-    '''
-    data324, data329 = clean_bus_data()
+
+    data324 = clean_bus_data()
     print("Data cleaned successfully!")
     print(f"data324 shape: {data324.shape}")
-    print(f"data329 shape: {data329.shape}")
     print(data324.head())
     print(data324.columns)
-    '''
-    print(fuel_efficiency_data())
+    print(fuel_efficiency_data().head()[["Date", "weekend/ph", "start_time", "end_time"]])
+    merge_data()
 
 
 
