@@ -4,7 +4,7 @@ import sqlite3
 import numpy as np
 import plotly.graph_objects as go
 
-st.set_page_config(page_title="Fleet Risk Warning", layout="wide")
+st.set_page_config(page_title="Fleet Risk Warning")
 
 def get_bus_data():
     """Fetch all trips data from the database grouped by bus"""
@@ -94,7 +94,13 @@ def create_bus_plot(bus_data):
 
 def main():
     st.title("Fleet Risk Warning System")
-    
+    curr_status = st.selectbox("Status",
+                          ["Review ⚠️⚠️", "Monitor ⚠️", "Normal ✅"],
+                          index = None,
+                          placeholder = None)
+    license_plate = st.text_input(label = "License Plate",
+                                  type = "default",
+    )
     # Fetch data
     df_trips = get_bus_data()
     
@@ -118,46 +124,44 @@ def main():
     
     # Display bus status cards
     st.subheader("Bus Fleet Status Overview")
+    @st.dialog("Bus Details", width = "medium")
+    def modal(license_plate):
+        bus_data = df_trips[df_trips['license_plate'] == license_plate].reset_index(drop=True)
+        col1, col2 = st.columns([0.7, 0.3])
+        with col1:
+            fig = create_bus_plot(bus_data)
+            st.plotly_chart(fig, use_container_width=True)
+        with col2:
+            st.metric("Total Trips", len(bus_data))
+            st.metric("Average Residual", f"{bus_data['residual'].mean():.3f}")
+            st.metric("Std Dev Residual", f"{bus_data['residual'].std():.3f}")
+            st.metric("Min Expected", f"{bus_data['expected'].min():.2f}")
+            st.metric("Max Expected", f"{bus_data['expected'].max():.2f}")
+
     for i, bus_info in enumerate(bus_status_list):
         status_display, color = get_status_display(bus_info['Status'])
-        
+        if curr_status and status_display != curr_status:
+            continue
+        if license_plate and not (license_plate in bus_info["Bus"]):
+            continue
         st.markdown(
-            f"""
-            <div style="
-                background-color: {color};
-                padding: 1rem;
-                border-radius: 0.5rem;
-                margin-bottom: 1rem;
-                opacity: 0.8;
-            ">
-                <h3 style="margin: 0;">{bus_info['Bus']}</h3>
-                <p style="margin: 0.5rem 0 0 0;"><b>Status:</b> {status_display}</p>
-                <p style="margin: 0.3rem 0 0 0;"><b>Trips:</b> {bus_info['Trip Count']} | <b>Avg Residual:</b> {bus_info['Avg Residual']:.2f}</p>
-            </div>
-            """,
-            unsafe_allow_html=True,
+                f"""
+                <div style="
+                    background-color: {color};
+                    padding: 0.6rem;
+                    border-radius: 0.4rem;
+                ">
+                """,
+                unsafe_allow_html=True,
         )
-    
-    # Display detailed graphs for each bus
-    st.subheader("Detailed Bus Performance Graphs")
-    
-    for bus in buses:
-        bus_data = df_trips[df_trips['license_plate'] == bus].reset_index(drop=True)
-        status = calculate_status(bus_data['residual'].values)
-        status_display, _ = get_status_display(status)
         
-        with st.expander(f"{bus} - {status_display}", expanded=False):
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                fig = create_bus_plot(bus_data)
-                st.plotly_chart(fig, use_container_width=True)
-            
-            with col2:
-                st.metric("Total Trips", len(bus_data))
-                st.metric("Average Residual", f"{bus_data['residual'].mean():.3f}")
-                st.metric("Std Dev Residual", f"{bus_data['residual'].std():.3f}")
-                st.metric("Min Expected", f"{bus_data['expected'].min():.2f}")
-                st.metric("Max Expected", f"{bus_data['expected'].max():.2f}")
+        if st.button(
+            f"{bus_info['Bus']} | {status_display} | {bus_info['Trip Count']} trips | Avg. Residual: {round(bus_info['Avg Residual'], 2)}",
+            use_container_width=True,
+            key = bus_info["Bus"]
+        ):
+            modal(bus_info["Bus"])
+        st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
+
 if __name__ == "__main__":
     main()
