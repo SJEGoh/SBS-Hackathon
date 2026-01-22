@@ -39,8 +39,6 @@ def main():
     print("R2 score:", r2_score)
     # replace and test the rmse based on good data
     # compare prediction here against naive approach
-    print(results)
-    print(test_data[["Fuel Efficiency KML", "Workshop activities"]])
 
     residuals = results - test_data["Fuel Efficiency KML"]
     
