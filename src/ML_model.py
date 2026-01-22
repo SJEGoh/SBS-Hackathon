@@ -21,8 +21,8 @@ class ML_model:
         n = len(fuel_efficiency)
         t = np.arange(n)
 
-        half_life = 5  # e.g. 30 trips/days until weight halves
-        w = 0.5 ** ((n - 1 - t) / half_life)  # newest weight = 1.0
+        half_life = 5  
+        w = 0.5 ** ((n - 1 - t) / half_life)  
         r = np.asarray(fuel_efficiency).reshape(-1)
         self.model.fit(features, r, sample_weight = w)
         # Look into sample weight
