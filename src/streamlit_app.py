@@ -28,6 +28,13 @@ def main():
         st.write("Bus Details: ")
 
         # Add graph here
+    status = st.selectbox("Status",
+                          ["Review ⚠️⚠️", "Monitor ⚠️", "Normal ✅"],
+                          index = None,
+                          placeholder = None)
+    license_plate = st.text_input(label = "License Plate",
+                                  type = "default",
+    )
 
     for i, row in df.iterrows():
         bg = STATUS_COLOURS.get(row["Status"], "#ffffff")
