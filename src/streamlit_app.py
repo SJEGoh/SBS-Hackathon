@@ -1,18 +1,51 @@
 import streamlit as st
+import pandas as pd
+
+df = pd.DataFrame({
+    "Bus": ["5-12", "329-07", "324-03"],
+    "DriftPct": [18, 12, 2],
+    "Status": ["Review", "Monitor", "Normal"]
+})
+
+STATUS_COLOURS = {
+    "Review":  "#fdecea",   # light red
+    "Monitor": "#fff4cc",   # light amber
+    "Normal":  "#edf7ed",   # light green
+}
 
 def main():
-    st.title("Early Warning System")
-    st.set_page_config(page_title = "")
+    st.title("Fleet Risk Warning")
+    st.set_page_config(page_title = "Early Warning System")
 
     @st.dialog("Bus Details")
     def modal(license_plate):
         st.write(f"Details for {license_plate}")
         st.write("Recommendation: [Placeholder]")
-        # Add graph here
-    
-    if st.button("SBS8413R"):
-        modal("SBS8413R")
-        # pull up details for that bus
+        st.write("Bus Details: ")
 
+        # Add graph here
+
+    for i, row in df.iterrows():
+        bg = STATUS_COLOURS.get(row["Status"], "#ffffff")
+
+        st.markdown(
+            f"""
+            <div style="
+                background-color: {bg};
+                padding: 0.6rem;
+                border-radius: 0.4rem;
+                margin-bottom: 0.3rem;
+            ">
+            """,
+            unsafe_allow_html=True,
+        )
+
+        c1, c2, c3, c4 = st.columns([2, 1, 1, 1])
+        c1.write(row["Bus"])
+        c2.write(f"{row['DriftPct']}%")
+        c3.write(row["Status"])
+        if c4.button("Inspect", key=f"inspect_{i}"):
+            modal(row["Bus"])
+        st.markdown("</div>", unsafe_allow_html=True)
 if __name__ == "__main__":
     main()
