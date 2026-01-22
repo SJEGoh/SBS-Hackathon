@@ -6,6 +6,10 @@ import plotly.graph_objects as go
 
 st.set_page_config(page_title="Fleet Risk Warning")
 
+# Residual change thresholds
+THRESHOLD_A = 0.025  # Monitor threshold
+THRESHOLD_B = 0.05  # Review threshold
+
 def get_bus_data():
     """Fetch all trips data from the database grouped by bus"""
     conn = sqlite3.connect('sbs.db')
@@ -19,35 +23,28 @@ def get_bus_data():
     conn.close()
     return df
 
-def calculate_status(residuals):
+def calculate_status(residuals, threshold_a, threshold_b):
     """
-    Determine bus status based on residual trends:
-    - "Monitor": Gradual decrease over trips
-    - "Review": Sudden large change
+    Determine bus status based on change in residuals:
+    - "Monitor": Change in residual > threshold_a but < threshold_b
+    - "Review": Change in residual > threshold_b
     - "Normal": Otherwise
     """
     if len(residuals) < 2:
-        return "Normal"
+        return "Normal", 0.0
     
     residuals = np.array(residuals)
     
-    # Check for sudden large changes (>2 standard deviations from mean)
-    std = np.std(residuals)
-    mean = np.mean(residuals)
-    sudden_changes = np.where(np.abs(residuals - mean) > 2 * std)[0]
+    # Calculate the maximum change in residual across consecutive trips
+    residual_changes = np.abs(np.diff(residuals))
+    max_change = np.max(residual_changes)
     
-    if len(sudden_changes) > 0:
-        return "Review"
-    
-    # Check for gradual decrease trend (decreasing average over time windows)
-    window_size = max(2, len(residuals) // 3)
-    if len(residuals) >= window_size * 2:
-        first_half = np.mean(residuals[:len(residuals)//2])
-        second_half = np.mean(residuals[len(residuals)//2:])
-        if second_half < first_half * 0.95:  # 5% decrease threshold
-            return "Monitor"
-    
-    return "Normal"
+    if max_change > threshold_b:
+        return "Review", max_change
+    elif max_change > threshold_a:
+        return "Monitor", max_change
+    else:
+        return "Normal", max_change
 
 def get_status_display(status):
     """Format status with emoji and color"""
@@ -94,6 +91,7 @@ def create_bus_plot(bus_data):
 
 def main():
     st.title("Fleet Risk Warning System")
+    
     curr_status = st.selectbox("Status",
                           ["Review ⚠️⚠️", "Monitor ⚠️", "Normal ✅"],
                           index = None,
@@ -114,12 +112,12 @@ def main():
     
     for bus in buses:
         bus_data = df_trips[df_trips['license_plate'] == bus].reset_index(drop=True)
-        status = calculate_status(bus_data['residual'].values)
+        status, max_change = calculate_status(bus_data['residual'].values, THRESHOLD_A, THRESHOLD_B)
         bus_status_list.append({
             'Bus': bus,
             'Status': status,
             'Trip Count': len(bus_data),
-            'Avg Residual': bus_data['residual'].mean()
+            'Max Residual Change': max_change
         })
     
     # Display bus status cards
@@ -133,8 +131,12 @@ def main():
             st.plotly_chart(fig, use_container_width=True)
         with col2:
             st.metric("Total Trips", len(bus_data))
-            st.metric("Average Residual", f"{bus_data['residual'].mean():.3f}")
-            st.metric("Std Dev Residual", f"{bus_data['residual'].std():.3f}")
+            # Calculate residual changes
+            residuals = bus_data['residual'].values
+            if len(residuals) > 1:
+                residual_changes = np.abs(np.diff(residuals))
+                st.metric("Max Residual Change", f"{np.max(residual_changes):.3f}")
+                st.metric("Mean Residual Change", f"{np.mean(residual_changes):.3f}")
             st.metric("Min Expected", f"{bus_data['expected'].min():.2f}")
             st.metric("Max Expected", f"{bus_data['expected'].max():.2f}")
 
@@ -156,7 +158,7 @@ def main():
         )
         
         if st.button(
-            f"{bus_info['Bus']} | {status_display} | {bus_info['Trip Count']} trips | Avg. Residual: {round(bus_info['Avg Residual'], 2)}",
+            f"{bus_info['Bus']} | {status_display} | {bus_info['Trip Count']} trips | Max Change: {round(bus_info['Max Residual Change'], 2)}",
             use_container_width=True,
             key = bus_info["Bus"]
         ):
