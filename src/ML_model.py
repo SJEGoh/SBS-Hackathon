@@ -1,5 +1,6 @@
 import numpy as np
 from sklearn.ensemble import ExtraTreesRegressor
+from sklearn.metrics import root_mean_squared_error
 
 class ML_model:
     def __init__(self):
@@ -28,8 +29,11 @@ class ML_model:
         self._fitted = True
         print("Model fitted!")
     
-    def predict(self, test_features):
-        return self.model.predict(test_features)
+    def predict(self, test_features, test_result):
+        y = self.model.predict(test_features)
+        return y, root_mean_squared_error(y, test_result)
+    
+
 
     
 

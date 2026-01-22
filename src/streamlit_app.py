@@ -4,13 +4,17 @@ import pandas as pd
 df = pd.DataFrame({
     "Bus": ["5-12", "329-07", "324-03"],
     "DriftPct": [18, 12, 2],
-    "Status": ["Review", "Monitor", "Normal"]
+    "Status": ["Review ⚠️⚠️", "Monitor ⚠️", "Normal ✅"]
+})
+
+df1 = pd.DataFrame({
+    ""
 })
 
 STATUS_COLOURS = {
-    "Review":  "#fdecea",   # light red
-    "Monitor": "#fff4cc",   # light amber
-    "Normal":  "#edf7ed",   # light green
+    "Review ⚠️⚠️":  "red",   # light red
+    "Monitor ⚠️": "yellow",   # light amber
+    "Normal ✅":  "green",   # light green
 }
 
 def main():
