@@ -29,4 +29,5 @@ VALUES
 
 INSERT INTO "services" ("id", "service_no")
 VALUES
-(1, 5)
+(1, 5);
+
