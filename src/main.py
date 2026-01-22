@@ -81,8 +81,8 @@ def main():
         actual = subset_actual[i]
 
         # Kalman Step
-        kalman_prediction = kalman.step(z)
-        print(kalman_prediction)
+        kalman_residual, _ = kalman.step(z)
+        print(kalman_residual)
 
         # Retrieve Context from the row
         bus_plate = row["Bus"]
@@ -105,7 +105,7 @@ def main():
         cursor.execute('''
             INSERT INTO trips (bus_id, service_id, residual, datetime, expected, actual)
             VALUES (?, ?, ?, ?, ?, ?)
-        ''', (bus_id, service_id, float(z), timestamp_str, float(expected), float(actual)))
+        ''', (bus_id, service_id, float(kalman_residual), timestamp_str, float(expected), float(actual)))
 
     # Commit changes and close connection
     conn.commit()
