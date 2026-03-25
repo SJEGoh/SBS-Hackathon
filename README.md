@@ -1,5 +1,7 @@
 # SBS Transit Hackathon 2026 Project: Fuel Performance Degradation Early Warning & Monitoring System
 
+Done by: Goh Jun-en, Samuel and Alvin Ong Zhao Wei
+
 ## Overview
 
 This project is designed to monitor and analyze the fuel efficiency of bus fleets. By using advanced predictive modeling and data filtering techniques, fleet managers can gain insights into gradual or sudden changes in fuel performance and take timely action for maintenance and cost optimization.
